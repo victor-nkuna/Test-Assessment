@@ -6,8 +6,7 @@
 Automated test suite for [SauceDemo](https://www.saucedemo.com/) using Cypress, following the Page Object Model (POM) design pattern.
 
 ## Table of Contents
-	@FindBy(css="")
-	private WebElement webElement;
+
 - [Features](#features)
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
