@@ -1,0 +1,772 @@
+{
+	"info": {
+		"_postman_id": "712c0e38-f284-4d18-bb33-6b7e848dad3f",
+		"name": "Restful-Booker Collection",
+		"description": "# **API Testing Findings: RESTful Booker**\n\n**Collection Link**: [RestFul Booker](https://restful-booker.herokuapp.com/)  \n**Environment**: production-restful-booker  \n\n---\n\n## **Test Environment**\n\n| **Key** | **Value** |\n| --- | --- |\n| Base URL | `https://restful-booker.herokuapp.com` |\n| Test Data Source | Seed data via `POST /booking` |\n| Tools Used | Postman v11.34.5 |\n\n---\n\n## **Identified Issues Summary**\n\n| **Endpoint** | **HTTP Method** | **Issue Description** | **Severity** | **Status** |\n| --- | --- | --- | --- | --- |\n| `/auth` | POST | Returns 200 for invalid credentials (should be 401). | High | Open |\n| `/booking/{id}` | GET | Invalid ID (non-integer) returns 404 instead of 400. | Medium | Open |\n| `/booking` | DELETE | Returns 201 on successful deletion (should be 204). | High | Open |\n| `/ping` | GET | Returns 201 instead of 200. | Low | Open |\n| `/booking` (Update/PATCH) | PATCH | It requires a full payload instead of partial updates (design flaw). | Medium | Open |\n\n---\n\n## **Detailed Findings**\n\n### **1\\. Authentication (****`POST /auth`****)**\n\n**Issue**:\n\n- **Description**: Invalid credentials return status `200` with `{ \"reason\": \"Bad credentials\" }` instead of `401 Unauthorized`.\n    \n- **Steps to Reproduce**:\n    \n    1. body{ \"username\": \"invalid\", \"password\": \"invalid\" }\n        \n    2. Observe status code `200` instead of `401`.\n        \n- **Expected Result**: `401 Unauthorized`.\n    \n- **Actual Result**: `200 OK`.\n    \n\n### **2\\. Delete Booking (****`DELETE /booking/{id}`****)**\n\n**Issue**:\n\n| Forbidden |  |\n| --- | --- |\n|  |  |\n\n- **Description**: Successful deletion returns `201 Created` instead of `204 No Content`.\n    \n- **Steps to Reproduce**:\n    \n    1. Create a booking using `POST /booking` and save the `bookingid`.\n        \n    2. Send `DELETE /booking/{{booking_id}}` with valid `Cookie: token={{token}}`.\n        \n    3. Observe status code `201`.\n        \n- **Expected Result**: `204 No Content`.\n    \n- **Actual Result**: `201 Created`.\n    \n- **Severity**: High (misleading status code).\n    \n\n---\n\n### **3\\. Schema Validation Issues (****`GET /booking`****)**\n\n**Issue**:\n\n- **Description**: Missing schema validation for nested objects (e.g., `bookingdates`).\n    \n- **Steps to Reproduce**:\n    \n    1. Send `GET /booking/1`.\n        \n    2. Validate the response schema for `bookingdates` (e.g., date format `YYYY-MM-DD`).\n        \n- **Expected Result**: Strict schema validation.\n    \n- **Actual Result**: Accepts invalid date formats (e.g., `checkin: \"2023-13-32\"`).\n    \n\n---\n\n### **4\\. Error Handling (****`POST /booking`****)**\n\n**Issue**:\n\n- **Description**: Missing `400 Bad Request` for incomplete payloads.\n    \n- **Steps to Reproduce**:\n    \n    1. { \"firstname\": \"Jim\" }\n        \n    2. Observe status `200` instead of `400`.\n        \n- **Severity**: High.\n    \n\n---\n\n## **Postman-Specific Documentation**\n\n### **Test Scripts**\n\nTest scripts used for validation\n\n```\n// Schema Validation for GET /booking/{id}  \nconst schema = {  \n  type: \"object\",  \n  properties: {  \n    firstname: { type: \"string\" },  \n    totalprice: { type: \"number\" },  \n    depositpaid: { type: \"boolean\" },  \n    bookingdates: {  \n      type: \"object\",  \n      properties: {  \n        checkin: { type: \"string\", format: \"date\" },  \n        checkout: { type: \"string\", format: \"date\" }  \n      }  \n    }  \n  }  \n};  \npm.test(\"Schema is valid\", () => pm.response.to.have.jsonSchema(schema));  \n\n ```\n\n---\n\n### **Attachments**\n\n1. **Request/Response Exports**:\n    \n    - Export failing requests as `.json` from Postman.\n        \n2. **Environment Variables**:\n    \n    - `token`: Token from `/auth`.\n        \n    - `booking_id`: Dynamic ID from `POST /booking`.\n        \n\n---\n\n## **Notes**\n\n- The API uses `Cookie`\\-based auth instead of the standard `Authorization: Bearer` .\n    \n- Partial updates (`PATCH`) may require unnecessary fields.\n    \n\n---\n\n## **Export Instructions**\n\n1. **Postman Collection**:\n    \n    - Export the collection with all requests and test scripts.\n        \n2. **Environment**:\n    \n    - Export variables like `base_url`, `token`, and `booking_id`.\n        \n\n---",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "15726499"
+	},
+	"item": [
+		{
+			"name": "CreateToken",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"// Validate status",
+							"pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+							"",
+							"// Check token exists",
+							"const { token } = pm.response.json();",
+							"pm.test(\"Token is valid\", () => {",
+							"  pm.expect(token).to.be.a(\"string\").and.not.empty;",
+							"});",
+							"",
+							"// Schema validation",
+							"const schema = {",
+							"  type: \"object\",",
+							"  properties: { token: { type: \"string\" } },",
+							"  required: [\"token\"]",
+							"};",
+							"pm.test(\"Schema is valid\", () => pm.response.to.have.jsonSchema(schema));",
+							"",
+							"// Set environment variable",
+							"pm.environment.set(\"auth_token\", token);"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"username\": \"admin\",\r\n  \"password\": \"password123\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{baseUrl}}/auth",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"auth"
+					]
+				},
+				"description": "This request uses the saved `token` collection variable to access a secret 'name' stored against that token.\n\nIn this request, we used the `token` collection variable as a query param to fetch the name generated for that token. We have added a test to check that a name is correctly returned."
+			},
+			"response": []
+		},
+		{
+			"name": "Create Booking",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+							"",
+							"// Validate schema ",
+							"const schema = {",
+							"  type: \"object\",",
+							"  properties: {",
+							"    bookingid: { type: \"number\" },",
+							"    booking: {",
+							"      type: \"object\",",
+							"      properties: {",
+							"        firstname: { type: \"string\" },",
+							"        lastname: { type: \"string\" },",
+							"        totalprice: { type: \"number\" },",
+							"        depositpaid: { type: \"boolean\" },",
+							"        bookingdates: {",
+							"          type: \"object\",",
+							"          properties: {",
+							"            checkin: { type: \"string\" },",
+							"            checkout: { type: \"string\" }",
+							"          },",
+							"          required: [\"checkin\", \"checkout\"]",
+							"        },",
+							"        additionalneeds: { type: \"string\" }",
+							"      },",
+							"      required: [\"firstname\", \"lastname\", \"totalprice\", \"depositpaid\", \"bookingdates\"]",
+							"    }",
+							"  },",
+							"  required: [\"bookingid\", \"booking\"]",
+							"};",
+							"",
+							"pm.test(\"Schema valid\", () => pm.response.to.have.jsonSchema(schema));",
+							"",
+							"// Validate content and data type date format (YYYY-MM-DD) ",
+							"pm.test(\"Check-in  and Check-out dates are in valid format (YYYY-MM-DD)\", function () {",
+							"    let jsonData = pm.response.json();",
+							"    let checkin = jsonData.booking.bookingdates.checkin;",
+							"    let checkout = jsonData.booking.bookingdates.checkout;",
+							"",
+							"    function isValidDateFormat(dateString) {",
+							"        if (!dateString || typeof dateString !== \"string\") return false;",
+							"",
+							"        let parts = dateString.split(\"-\");",
+							"        if (parts.length !== 3) return false;",
+							"",
+							"        let [year, month, day] = parts;",
+							"        if (year.length !== 4 || month.length !== 2 || day.length !== 2) return false;",
+							"",
+							"        let date = new Date(`${year}-${month}-${day}`);",
+							"        return date instanceof Date && !isNaN(date);",
+							"    }",
+							"",
+							"    pm.expect(isValidDateFormat(checkin)).to.be.true;",
+							"    pm.expect(isValidDateFormat(checkout)).to.be.true;",
+							"});",
+							"",
+							"// Save booking ID",
+							"const { bookingid } = pm.response.json();",
+							"pm.environment.set(\"booking_id\", bookingid);",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n \n  \"firstname\": \"Victor \",\n  \"lastname\": \"Nkuna\",\n  \"totalprice\": 100,\n  \"depositpaid\": true,\n  \"bookingdates\": {\n    \"checkin\": \"2023-01-01\",\n    \"checkout\": \"2023-01-02\"\n  },\n  \"additionalneeds\": \"Breakfast\"\n}\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{baseUrl}}/booking",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"booking"
+					]
+				},
+				"description": "This request un-registers a token by using the token collection variable in the POST body.\n\nWe also added a test to ensure the response has a 200 OK status code."
+			},
+			"response": []
+		},
+		{
+			"name": "Get All Bookings",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status 200\", () => pm.response.to.have.status(200));\r",
+							"\r",
+							"// Validate schema (array of booking IDs)\r",
+							"const schema = {\r",
+							"  type: \"array\",\r",
+							"  items: {\r",
+							"    type: \"object\",\r",
+							"    properties: { bookingid: { type: \"number\" } },\r",
+							"    required: [\"bookingid\"]\r",
+							"  }\r",
+							"};\r",
+							"pm.test(\"Schema valid\", () => pm.response.to.have.jsonSchema(schema));\r",
+							"// Validate that the response JSON contains a string key 'bookingid' with a numeric value\r",
+							"pm.test(\"Content Type that each 'bookingid' key has a numeric value\", function () {\r",
+							"    pm.response.json().forEach(function(booking) {\r",
+							"        pm.expect(booking.bookingid).to.be.a('number');\r",
+							"    });\r",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				},
+				{
+					"listen": "prerequest",
+					"script": {
+						"packages": {},
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/booking",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"booking"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Booking by ID",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"\r",
+							"\r",
+							"pm.test(\"Response status code is 200\", function () {\r",
+							"  pm.response.to.have.status(200);\r",
+							"  \r",
+							"pm.test(\"Response contains firstname and lastname\", function () {\r",
+							"    let jsonData = pm.response.json();\r",
+							"    pm.expect(jsonData).to.have.property(\"firstname\");\r",
+							"    pm.expect(jsonData).to.have.property(\"lastname\");\r",
+							"});\r",
+							"\r",
+							"\r",
+							"pm.test(\"Response matches schema\", function () {\r",
+							"    const schema = {\r",
+							"        \"type\": \"object\",\r",
+							"        \"properties\": {\r",
+							"            \"firstname\": { \"type\": \"string\" },\r",
+							"            \"lastname\": { \"type\": \"string\" },\r",
+							"            \"totalprice\": { \"type\": \"number\" },\r",
+							"            \"depositpaid\": { \"type\": \"boolean\" },\r",
+							"            \"bookingdates\": {\r",
+							"                \"type\": \"object\",\r",
+							"                \"properties\": {\r",
+							"                    \"checkin\": { \"type\": \"string\", \"format\": \"date\" },\r",
+							"                    \"checkout\": { \"type\": \"string\", \"format\": \"date\" }\r",
+							"                },\r",
+							"                \"required\": [\"checkin\", \"checkout\"]\r",
+							"            },\r",
+							"            \"additionalneeds\": { \"type\": \"string\" }\r",
+							"        },\r",
+							"        \"required\": [\"firstname\", \"lastname\", \"totalprice\", \"depositpaid\", \"bookingdates\"]\r",
+							"    };\r",
+							"    pm.response.to.have.jsonSchema(schema);\r",
+							"});\r",
+							"\r",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				},
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"async function updateRandomBooking() {\r",
+							"    const baseUrl = \"https://restful-booker.herokuapp.com\";\r",
+							"    \r",
+							"    // Step 1: Get Authentication Token\r",
+							"    async function getAuthToken() {\r",
+							"        const authPayload = {\r",
+							"            \"username\": \"admin\",\r",
+							"            \"password\": \"password123\"\r",
+							"        };\r",
+							"\r",
+							"        const authResponse = await fetch(`${baseUrl}/auth`, {\r",
+							"            method: \"POST\",\r",
+							"            headers: { \"Content-Type\": \"application/json\" },\r",
+							"            body: JSON.stringify(authPayload)\r",
+							"        });\r",
+							"\r",
+							"        if (!authResponse.ok) throw new Error(\"Failed to get auth token\");\r",
+							"        const authData = await authResponse.json();\r",
+							"        return authData.token; \r",
+							"    }\r",
+							"\r",
+							"    // Step 2: Get a valid booking ID\r",
+							"    async function getValidBookingId() {\r",
+							"        const response = await fetch(`${baseUrl}/booking`);\r",
+							"        if (!response.ok) throw new Error(\"Failed to fetch booking IDs\");\r",
+							"\r",
+							"        const bookings = await response.json();\r",
+							"        if (bookings.length === 0) throw new Error(\"No bookings found\");\r",
+							"\r",
+							"        // Loop to find a valid booking ID\r",
+							"        for (let i = 0; i < bookings.length; i++) {\r",
+							"            const booking_id = bookings[i].booking_id;\r",
+							"\r",
+							"            // Validate booking ID with GET /booking/:id\r",
+							"            const checkResponse = await fetch(`${baseUrl}/booking/${booking_id}`);\r",
+							"            if (checkResponse.ok) {\r",
+							"                return bookingId; // Return the first valid booking ID\r",
+							"            }\r",
+							"        }\r",
+							"\r",
+							"        throw new Error(\"No valid booking ID found\");\r",
+							"    }\r",
+							"\r",
+							"    try {\r",
+							"        const token = await getAuthToken();\r",
+							"        console.log(`Auth Token: ${token}`);\r",
+							"\r",
+							"        const bookingi = await getValidBookingId();\r",
+							"        console.log(`Using Valid Booking ID: ${booking_id}`);\r",
+							"\r",
+							"        // Step 3: Update the booking\r",
+							"        const putData = {\r",
+							"            \"firstname\": \"John\",\r",
+							"            \"lastname\": \"Doe\",\r",
+							"            \"totalprice\": 200,\r",
+							"            \"depositpaid\": false,\r",
+							"            \"bookingdates\": {\r",
+							"                \"checkin\": \"2025-03-17\",\r",
+							"                \"checkout\": \"2025-03-21\"\r",
+							"            },\r",
+							"            \"additionalneeds\": \"Breakfast\"\r",
+							"        };\r",
+							"\r",
+							"        const putResponse = await fetch(`${baseUrl}/booking/${bookingId}`, {\r",
+							"            method: \"PUT\",\r",
+							"            headers: {\r",
+							"                \"Content-Type\": \"application/json\",\r",
+							"                \"Accept\": \"application/json\",\r",
+							"                \"Cookie\": `token=${token}`\r",
+							"            },\r",
+							"            body: JSON.stringify(putData)\r",
+							"        });\r",
+							"\r",
+							"        if (!putResponse.ok) throw new Error(\"Failed to update booking\");\r",
+							"\r",
+							"        const putResult = await putResponse.json();\r",
+							"        console.log(\"Booking Updated:\", putResult);\r",
+							"\r",
+							"    } catch (error) {\r",
+							"        console.error(\"Error:\", error);\r",
+							"    }\r",
+							"}\r",
+							"\r",
+							"// Run function\r",
+							"updateRandomBooking();\r",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/booking/2605",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"booking",
+						"2605"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Update Booking (Full Update)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {\r",
+							"    pm.response.to.have.status(200);\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Response has correct content type\", function () {\r",
+							"    pm.response.to.have.header(\"Content-Type\", \"application/json\");\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Response contains updated booking details\", function () {\r",
+							"    var jsonData = pm.response.json();\r",
+							"    pm.expect(jsonData.firstname).to.eql(\"James\");\r",
+							"    pm.expect(jsonData.lastname).to.eql(\"Brown\");\r",
+							"    pm.expect(jsonData.totalprice).to.eql(111);\r",
+							"    pm.expect(jsonData.depositpaid).to.be.true;\r",
+							"    pm.expect(jsonData.bookingdates.checkin).to.eql(\"2018-01-01\");\r",
+							"    pm.expect(jsonData.bookingdates.checkout).to.eql(\"2019-01-01\");\r",
+							"    pm.expect(jsonData.additionalneeds).to.eql(\"Breakfast\");\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Extract dynamic booking ID\", function () {\r",
+							"    var jsonData = pm.response.json();\r",
+							"    pm.globals.set(\"booking_id\", jsonData.booking_id);\r",
+							"    console.log(\"Booking ID stored: \" + jsonData.booking_id);\r",
+							"});\r",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				},
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"async function updateRandomBooking() {\r",
+							"    const baseUrl = \"https://restful-booker.herokuapp.com\";\r",
+							"    \r",
+							"    // Step 1: Get Authentication Token\r",
+							"    async function getAuthToken() {\r",
+							"        const authPayload = {\r",
+							"            \"username\": \"admin\",  // Default API username\r",
+							"            \"password\": \"password123\" // Default API password\r",
+							"        };\r",
+							"\r",
+							"        const authResponse = await fetch(`${baseUrl}/auth`, {\r",
+							"            method: \"POST\",\r",
+							"            headers: { \"Content-Type\": \"application/json\" },\r",
+							"            body: JSON.stringify(authPayload)\r",
+							"        });\r",
+							"\r",
+							"        if (!authResponse.ok) throw new Error(\"Failed to get auth token\");\r",
+							"        const authData = await authResponse.json();\r",
+							"        return authData.token;  // Extract token\r",
+							"    }\r",
+							"\r",
+							"    // Step 2: Get a random booking ID\r",
+							"    async function getRandomBookingId() {\r",
+							"        const response = await fetch(`${baseUrl}/booking`);\r",
+							"        if (!response.ok) throw new Error(\"Failed to fetch booking IDs\");\r",
+							"\r",
+							"        const bookings = await response.json();\r",
+							"        if (bookings.length === 0) throw new Error(\"No bookings found\");\r",
+							"\r",
+							"        // Select a random booking ID\r",
+							"        return bookings[Math.floor(Math.random() * bookings.length)].bookingid;\r",
+							"    }\r",
+							"\r",
+							"    try {\r",
+							"        const token = await getAuthToken();\r",
+							"        console.log(`Auth Token: ${token}`);\r",
+							"\r",
+							"        const bookingId = await getRandomBookingId();\r",
+							"        console.log(`Using Booking ID: ${bookingId}`);\r",
+							"\r",
+							"        // Step 3: Update the booking\r",
+							"        const putData = {\r",
+							"            \"firstname\": \"John\",\r",
+							"            \"lastname\": \"Doe\",\r",
+							"            \"totalprice\": 200,\r",
+							"            \"depositpaid\": false,\r",
+							"            \"bookingdates\": {\r",
+							"                \"checkin\": \"2025-03-17\",\r",
+							"                \"checkout\": \"2025-03-21\"\r",
+							"            },\r",
+							"            \"additionalneeds\": \"Breakfast\"\r",
+							"        };\r",
+							"\r",
+							"        const putResponse = await fetch(`${baseUrl}/booking/${bookingId}`, {\r",
+							"            method: \"PUT\",\r",
+							"            headers: {\r",
+							"                \"Content-Type\": \"application/json\",\r",
+							"                \"Accept\": \"application/json\",\r",
+							"                \"Cookie\": `token=${token}`\r",
+							"            },\r",
+							"            body: JSON.stringify(putData)\r",
+							"        });\r",
+							"\r",
+							"        if (!putResponse.ok) throw new Error(\"Failed to update booking\");\r",
+							"\r",
+							"        const putResult = await putResponse.json();\r",
+							"        console.log(\"Booking Updated:\", putResult);\r",
+							"\r",
+							"    } catch (error) {\r",
+							"        console.error(\"Error:\", error);\r",
+							"    }\r",
+							"}\r",
+							"\r",
+							"// Run function\r",
+							"updateRandomBooking();\r",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"protocolProfileBehavior": {
+				"disabledSystemHeaders": {}
+			},
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Cookie",
+						"value": "token={{auth_token}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"firstname\": \"John\",\r\n    \"lastname\": \"Smith\",\r\n    \"totalprice\": 111,\r\n    \"depositpaid\": true,\r\n    \"bookingdates\": {\r\n        \"checkin\": \"2000-01-01\",\r\n        \"checkout\": \"2025-05-31\"\r\n    },\r\n    \"additionalneeds\": \"Breakfast\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{baseUrl}}/2605",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"2605"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Booking - PartialUpdateBooking",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {\r",
+							"    pm.response.to.have.status(200);\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Response has correct content type\", function () {\r",
+							"    pm.response.to.have.header(\"Content-Type\", \"application/json\");\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Response contains updated booking details\", function () {\r",
+							"    var jsonData = pm.response.json();\r",
+							"    pm.expect(jsonData.firstname).to.eql(\"James\");\r",
+							"    pm.expect(jsonData.lastname).to.eql(\"Brown\");\r",
+							"    pm.expect(jsonData.totalprice).to.eql(111);\r",
+							"    pm.expect(jsonData.depositpaid).to.be.true;\r",
+							"    pm.expect(jsonData.bookingdates.checkin).to.eql(\"2018-01-01\");\r",
+							"    pm.expect(jsonData.bookingdates.checkout).to.eql(\"2019-01-01\");\r",
+							"    pm.expect(jsonData.additionalneeds).to.eql(\"Breakfast\");\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Extract dynamic booking ID\", function () {\r",
+							"    var jsonData = pm.response.json();\r",
+							"    pm.globals.set(\"booking_id\", jsonData.booking_id);\r",
+							"    console.log(\"Booking ID stored: \" + jsonData.booking_id);\r",
+							"});\r",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"protocolProfileBehavior": {
+				"disabledSystemHeaders": {}
+			},
+			"request": {
+				"method": "PATCH",
+				"header": [
+					{
+						"key": "Cookie",
+						"value": "token={{auth_token}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"firstname\": \"Victor\",\r\n    \"lastname\": \"QA Nkuna\",\r\n    \"totalprice\": 2500,\r\n    \"depositpaid\": true,\r\n    \"bookingdates\": {\r\n        \"checkin\": \"2000-01-01\",\r\n        \"checkout\": \"2019-01-01\"\r\n    },\r\n    \"additionalneeds\": \"Breakfast\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{baseUrl}}/booking/2605",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"booking",
+						"2605"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Booking - DeleteBooking",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {\r",
+							"    pm.response.to.have.status(200);\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Response has correct content type\", function () {\r",
+							"    pm.response.to.have.header(\"Content-Type\", \"application/json\");\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Response contains updated booking details\", function () {\r",
+							"    var jsonData = pm.response.json();\r",
+							"    pm.expect(jsonData.firstname).to.eql(\"James\");\r",
+							"    pm.expect(jsonData.lastname).to.eql(\"Brown\");\r",
+							"    pm.expect(jsonData.totalprice).to.eql(111);\r",
+							"    pm.expect(jsonData.depositpaid).to.be.true;\r",
+							"    pm.expect(jsonData.bookingdates.checkin).to.eql(\"2018-01-01\");\r",
+							"    pm.expect(jsonData.bookingdates.checkout).to.eql(\"2019-01-01\");\r",
+							"    pm.expect(jsonData.additionalneeds).to.eql(\"Breakfast\");\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Extract dynamic booking ID\", function () {\r",
+							"    var jsonData = pm.response.json();\r",
+							"    pm.globals.set(\"booking_id\", jsonData.booking_id);\r",
+							"    console.log(\"Booking ID stored: \" + jsonData.booking_id);\r",
+							"});\r",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"protocolProfileBehavior": {
+				"disabledSystemHeaders": {}
+			},
+			"request": {
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "Cookie",
+						"value": "token=abc123",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/booking/1",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"booking",
+						"1"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Ping - HealthCheck",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {\r",
+							"    pm.response.to.have.status(200);\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Response has correct content type\", function () {\r",
+							"    pm.response.to.have.header(\"Content-Type\", \"application/json\");\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Response contains updated booking details\", function () {\r",
+							"    var jsonData = pm.response.json();\r",
+							"    pm.expect(jsonData.firstname).to.eql(\"James\");\r",
+							"    pm.expect(jsonData.lastname).to.eql(\"Brown\");\r",
+							"    pm.expect(jsonData.totalprice).to.eql(111);\r",
+							"    pm.expect(jsonData.depositpaid).to.be.true;\r",
+							"    pm.expect(jsonData.bookingdates.checkin).to.eql(\"2018-01-01\");\r",
+							"    pm.expect(jsonData.bookingdates.checkout).to.eql(\"2019-01-01\");\r",
+							"    pm.expect(jsonData.additionalneeds).to.eql(\"Breakfast\");\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Extract dynamic booking ID\", function () {\r",
+							"    var jsonData = pm.response.json();\r",
+							"    pm.globals.set(\"booking_id\", jsonData.booking_id);\r",
+							"    console.log(\"Booking ID stored: \" + jsonData.booking_id);\r",
+							"});\r",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true,
+				"disabledSystemHeaders": {}
+			},
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Cookie",
+						"value": "token={{auth_token}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"firstname\": \"John\",\r\n    \"lastname\": \"Smith\",\r\n    \"totalprice\": 111,\r\n    \"depositpaid\": true,\r\n    \"bookingdates\": {\r\n        \"checkin\": \"2000-01-01\",\r\n        \"checkout\": \"2019-01-01\"\r\n    },\r\n    \"additionalneeds\": \"Breakfast\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{baseUrl}}/booking/ping",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"booking",
+						"ping"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "token",
+			"value": "{{auth_token}}"
+		},
+		{
+			"key": "baseUrl",
+			"value": "https://restful-booker.herokuapp.com"
+		}
+	]
+}
