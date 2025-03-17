@@ -1,0 +1,21 @@
+{
+  "name": "cypress",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+  "test": "npx cypress run",
+  "report": "npm run open:report",  
+  "open:report": "npx opener cypress/reports/index.html",
+  "cy:open": "npx cypress open"
+},
+  "keywords": [],
+  "author": "victor Nkuna",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "cypress-mochawesome-reporter": "^3.8.2",
+    "dotenv": "^16.4.7",
+    "mochawesome": "^7.1.3",
+    "opener": "^1.5.2"
+  }
+}
