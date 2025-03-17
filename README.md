@@ -45,8 +45,8 @@ Automated test suite for [SauceDemo](https://www.saucedemo.com/) using Cypress, 
 
 1. Clone repository:
    ```bash
-   git clone https://github.com/developerVictorNkuna/saucedemo-cypress.git
-   cd saucedemo-cypress
+   git clone https://github.com/developerVictorNkuna/Test-Assessment.git
+   cd Test-Assessment
 
    # Cypress Test Automation Setup
 
